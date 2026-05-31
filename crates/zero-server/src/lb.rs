@@ -1,5 +1,5 @@
 //! Load balancer: accept on :9999, round-robin, hand the raw fd to a worker via
-//! SCM_RIGHTS. Off the request path. Port of the top1 lb.cpp.
+//! SCM_RIGHTS. Off the request path.
 
 use std::os::raw::c_void;
 use std::time::Duration;

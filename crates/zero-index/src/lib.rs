@@ -1,4 +1,4 @@
-//! IVF index core. Faithful port of the f32 reference pipeline (accuracy 6000).
+//! IVF index core: pair-SoA format, int16 quantization, 14-dim normalization, search.
 
 pub mod format;
 pub mod normalize;

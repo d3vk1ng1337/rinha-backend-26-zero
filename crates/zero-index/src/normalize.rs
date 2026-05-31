@@ -1,6 +1,6 @@
-//! Bit-exact port of dalvorsn's `normalizer.hpp`: features in f32, then ×10000
-//! in f64 + round. Keep f32 on features — the rounding boundary is what matches
-//! the official ground-truth.
+//! 14-dim feature normalization. Features are computed in f32, then scaled by
+//! 10000 in f64 and rounded to i16. The f32 step is deliberate: its rounding
+//! boundary is what matches the reference dataset's quantization.
 
 use crate::quant::quantize;
 
@@ -42,7 +42,7 @@ fn mcc_risk(mcc: &[u8]) -> f32 {
     }
 }
 
-/// Mirrors dalvorsn's `fast_f32`: int and frac parts summed in f32.
+/// Parse a decimal: integer and fractional parts summed in f32.
 #[inline]
 fn fast_f32(b: &[u8], mut p: usize) -> f32 {
     let n = b.len();
