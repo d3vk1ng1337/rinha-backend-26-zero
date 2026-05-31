@@ -1,0 +1,6 @@
+/target
+*.bin
+/test/test-data.json
+/data/references.json
+# documentação interna fica local — fora do repo público (anonimato + limpeza)
+/docs/

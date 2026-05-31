@@ -1,0 +1,17 @@
+[package]
+name = "zero-server"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "zero-server"
+path = "src/main.rs"
+
+[dependencies]
+zero-index = { path = "../zero-index" }
+
+# Deps Linux-only: no macOS o build pula os módulos cfg(linux) e estas deps
+# nem são puxadas, mantendo `cargo build` verde no Mac.
+[target.'cfg(target_os = "linux")'.dependencies]
+io-uring = "0.7"
+libc = "0.2"

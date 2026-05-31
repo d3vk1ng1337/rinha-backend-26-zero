@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/zero-index",
+    "crates/zero-convert",
+    "crates/zero-gate",
+    "crates/zero-server",
+]
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"

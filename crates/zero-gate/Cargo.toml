@@ -1,0 +1,12 @@
+[package]
+name = "zero-gate"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "zero-gate"
+path = "src/main.rs"
+
+[dependencies]
+zero-index = { path = "../zero-index" }
+serde_json = "1"

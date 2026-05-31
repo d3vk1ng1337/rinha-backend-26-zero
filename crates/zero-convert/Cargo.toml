@@ -1,0 +1,13 @@
+[package]
+name = "zero-convert"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "zero-convert"
+path = "src/main.rs"
+
+[dependencies]
+zero-index = { path = "../zero-index" }
+flate2 = "1"
+rayon = "1"

@@ -1,0 +1,12 @@
+Zero — Rinha de Backend 2026
+
+O núcleo algorítmico (normalização 14-dim, quantização int16, layout IVF
+pair-SoA, k-means do converter e busca + repair pass) é portado de:
+
+  dalvorsn/cpp-rinha-backend-2026  (MIT License)
+  https://github.com/dalvorsn/cpp-rinha-backend-2026
+
+A contribuição original deste projeto é a arquitetura de I/O em Rust
+(worker io_uring "zero-syscall": DEFER_TASKRUN + multishot recv + provided
+buffer ring + registered files/buffers), o fallback epoll hardened, e o
+harness de build/verificação. Atribuição mantida conforme a licença MIT.
