@@ -1,0 +1,71 @@
+x-worker: &worker
+  image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:latest
+  command: ["worker"]
+  volumes:
+    - socks:/run/sock
+  ulimits:
+    nofile:
+      soft: 65535
+      hard: 65535
+
+services:
+  worker0:
+    <<: *worker
+    environment:
+      CTRL: /run/sock/api0.ctrl
+      INDEX_PATH: /index/index.bin
+      NPROBE: "12"
+      REPAIR_MIN: "1"
+      REPAIR_MAX: "4"
+      BUSY_POLL_US: "50"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.45"
+          memory: 150M
+
+  worker1:
+    <<: *worker
+    environment:
+      CTRL: /run/sock/api1.ctrl
+      INDEX_PATH: /index/index.bin
+      NPROBE: "12"
+      REPAIR_MIN: "1"
+      REPAIR_MAX: "4"
+      BUSY_POLL_US: "50"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.45"
+          memory: 150M
+
+  lb:
+    image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:latest
+    command: ["lb"]
+    environment:
+      PORT: "9999"
+      BACKENDS: "/run/sock/api0.ctrl,/run/sock/api1.ctrl"
+    ports:
+      - "9999:9999"
+    volumes:
+      - socks:/run/sock
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    depends_on:
+      - worker0
+      - worker1
+    deploy:
+      resources:
+        limits:
+          cpus: "0.10"
+          memory: 32M
+
+volumes:
+  socks:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "size=10m"
