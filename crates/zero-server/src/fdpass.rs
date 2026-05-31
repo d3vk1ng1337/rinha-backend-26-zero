@@ -1,13 +1,8 @@
-//! Passagem de fd via SCM_RIGHTS sobre unix socket (LB → worker).
-//! O LB aceita a conexão TCP e entrega o fd cru ao worker, que passa a ser o
-//! dono — sem proxy no caminho de request.
-
 use std::mem;
 use std::os::raw::c_void;
 
 const CMSG_BUF: usize = 64; // >= CMSG_SPACE(sizeof(i32))
 
-/// Envia `fd` pelo unix socket `sock`. Retorna bytes enviados (1) ou <0 em erro.
 pub fn send_fd(sock: i32, fd: i32) -> isize {
     unsafe {
         let mut byte: u8 = 1;
@@ -36,7 +31,6 @@ pub fn send_fd(sock: i32, fd: i32) -> isize {
     }
 }
 
-/// Recebe um fd pelo unix socket `sock`. Retorna o fd, ou <0 em erro/EOF.
 pub fn recv_fd(sock: i32) -> i32 {
     unsafe {
         let mut byte: u8 = 0;

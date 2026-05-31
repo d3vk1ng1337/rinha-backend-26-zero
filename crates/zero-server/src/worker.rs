@@ -1,7 +1,3 @@
-//! Worker epoll hardened (braço A2 / fallback + controle do A/B).
-//! Recebe fds via ctrl unix socket (SCM_RIGHTS do LB), faz recv→parse→IVF→send
-//! com keep-alive. Hardening: mlockall + affinity + índice em RAM + NODELAY.
-
 use std::os::raw::{c_int, c_void};
 
 use zero_index::normalize::normalize;
@@ -56,7 +52,6 @@ fn epoll_del(epfd: i32, fd: i32) {
 
 fn create_ctrl_socket(path: &str) -> i32 {
     unsafe {
-        // mkdir do diretório-pai (ignora erro se já existe)
         if let Some(slash) = path.rfind('/') {
             let dir = std::ffi::CString::new(&path[..slash]).unwrap();
             libc::mkdir(dir.as_ptr(), 0o755);
@@ -83,7 +78,6 @@ fn create_ctrl_socket(path: &str) -> i32 {
     }
 }
 
-/// EPIOCSPARAMS (kernel 6.9+) — busy-poll no epoll. Opcional (BUSY_POLL_US>0).
 #[repr(C)]
 struct EpollParams {
     busy_poll_usecs: u32,
@@ -277,7 +271,6 @@ fn handle_read(
     }
     conn.have += n as usize;
 
-    // processa todos os requests completos no buffer
     let mut consumed_total = 0usize;
     let mut should_close = false;
     loop {
@@ -319,7 +312,6 @@ fn handle_read(
         }
     }
 
-    // compacta o leftover
     if consumed_total > 0 {
         let leftover = conn.have - consumed_total;
         if leftover > 0 {
@@ -332,7 +324,6 @@ fn handle_read(
     }
 }
 
-/// Envia tudo; tiny responses raramente bloqueiam. Em EAGAIN, poll curto.
 fn send_all(fd: i32, mut data: &[u8]) -> bool {
     while !data.is_empty() {
         let n = unsafe {

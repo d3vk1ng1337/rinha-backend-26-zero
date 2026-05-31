@@ -1,45 +1,35 @@
-# Zero — Rinha de Backend 2026 (Rust, io_uring zero-syscall)
+# Zero
 
-Backend de detecção de fraude por busca vetorial para a
-[Rinha de Backend 2026](https://github.com/zanfranceschi/rinha-de-backend-2026).
-
-**Tese:** o gargalo de p99 no rig (Mac Mini Late 2014, 1 CPU) não é compute (a
-busca IVF é ~1-3 µs) — é syscall/scheduling/queueing. O diferencial inédito na
-rinha é um **worker io_uring "zero-syscall"** (`DEFER_TASKRUN` + multishot recv
-em provided-buffer ring + registered files/buffers), com fallback **epoll
-hardened** como rede de segurança e braço de controle de A/B.
-
-## Arquitetura (regra-legal: bridge, ≥1 LB + 2 APIs round-robin)
-
-```
-k6 :9999 ─► lb (io_uring multishot accept + SCM_RIGHTS fd-pass) ─► worker0 / worker1
-                                                                    io_uring zero-syscall
-                                                                    IVF int16 (RAM + mlock + hugepages)
-```
+A submission for [Rinha de Backend 2026](https://github.com/zanfranceschi/rinha-de-backend-2026):
+fraud detection by vector search. Each transaction is reduced to a 14-dimensional
+feature vector. We find its 5 nearest reference vectors through an int16 IVF
+index (AVX2-accelerated distance) and return `fraud_score = fraud_count / 5`,
+the fraction of those neighbors labeled fraudulent. The service is written in
+Rust as single-threaded epoll workers sitting behind a round-robin load balancer
+that hands off accepted connections to the workers via `SCM_RIGHTS` fd passing.
 
 ## Crates
 
-| Crate | Papel |
-|---|---|
-| `zero-index` | núcleo sem deps: formato pair-SoA, quant int16, normalização 14-dim (f32), busca IVF + repair |
-| `zero-convert` | build-time: `references.json[.gz]` → k-means++ (k=4096) → `index.bin` |
-| `zero-gate` | valida FP/FN vs `expected_fraud_score` do `test-data.json` |
-| `zero-server` | (Linux) bin `lb`/`worker` — epoll e io_uring |
+- `zero-index` — core index, no external dependencies: vector format, int16
+  quantization, 14-dim normalization, and IVF nearest-neighbor search.
+- `zero-convert` — offline build step that turns the reference set into the
+  packed `index.bin` consumed at runtime.
+- `zero-gate` — accuracy check: runs the index against `test-data.json` and
+  reports false positives and false negatives versus the expected scores.
+- `zero-server` — the runtime binaries (Linux): the load balancer and the worker.
 
-## Accuracy
-
-A normalização é portada **bit-a-bit** do top1 (pipeline f32) que crava
-accuracy 6000. O `zero-gate` valida localmente (direcional no arm64); o árbitro
-bit-exato é o **offline gate amd64**.
-
-## Build & teste
+## Build and test
 
 ```sh
 cargo test -p zero-index
+cargo run --release -p zero-convert -- <refs> <out.bin>
+cargo run --release -p zero-gate -- <index.bin> <test-data.json>
+docker compose -f deploy/docker-compose.yml up --build
+```
+
+With the data checked into this repository:
+
+```sh
 cargo run --release -p zero-convert -- data/references.json.gz /tmp/index.bin
 cargo run --release -p zero-gate -- /tmp/index.bin test/test-data.json
 ```
-
-Medição de p99: ver `tools/provision-box.md` (box amd64 dedicado).
-
-Design: `docs/specs/`. Plano: `docs/plans/`.

@@ -1,7 +1,3 @@
-//! Converter: references.json[.gz] -> índice IVF pair-SoA (index.bin).
-//! k-means++ (k=4096, sample=50000, iters=50) -> assign -> blocos pair-SoA +
-//! bbox por cluster. Roda em build-time (Docker amd64) e localmente p/ o gate.
-
 use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -16,7 +12,6 @@ const DEFAULT_K: u32 = 4096;
 const DEFAULT_SAMPLE: u32 = 50_000;
 const DEFAULT_ITERS: u32 = 50;
 
-/// SplitMix64 — RNG determinístico simples (não precisa casar com o C++).
 struct Rng(u64);
 impl Rng {
     fn next_u64(&mut self) -> u64 {
@@ -77,7 +72,6 @@ fn parse_references(buf: &[u8]) -> (Vec<i16>, Vec<u8>) {
         let obj_end = q.min(n - 1);
         let obj = &buf[obj_start..=obj_end];
 
-        // vector: primeiro '[' do objeto
         let mut ok = false;
         if let Some(ab) = obj.iter().position(|&c| c == b'[') {
             let mut np = ab + 1;
@@ -281,7 +275,7 @@ fn build_ivf(vecs: &[i16], labels: &[u8], k: u32, sample_sz: u32, iters: u32) ->
         order[cursor[c] as usize] = i as u32;
         cursor[c] += 1;
     }
-    // ordena cada cluster por distância ao centroide (blocos iniciais = mais próximos)
+    // sort each cluster by distance so leading blocks hold the nearest vectors (early-out pruning)
     for c in 0..kk {
         if counts[c] < 2 {
             continue;
@@ -296,11 +290,9 @@ fn build_ivf(vecs: &[i16], labels: &[u8], k: u32, sample_sz: u32, iters: u32) ->
         });
     }
 
-    // serializa
     let layout = layout_for(k, total_blocks);
     let mut out = vec![0u8; layout.total];
 
-    // header
     out[0..8].copy_from_slice(&zero_index::format::MAGIC.to_le_bytes());
     out[8..12].copy_from_slice(&zero_index::format::VERSION.to_le_bytes());
     out[12..16].copy_from_slice(&n.to_le_bytes());
@@ -316,7 +308,6 @@ fn build_ivf(vecs: &[i16], labels: &[u8], k: u32, sample_sz: u32, iters: u32) ->
         out[off..off + 4].copy_from_slice(&v.to_le_bytes());
     };
 
-    // centroids (quantizados)
     for c in 0..kk {
         for d in 0..DIMS {
             let v = centroids[c][d].round() as i32;
@@ -325,7 +316,6 @@ fn build_ivf(vecs: &[i16], labels: &[u8], k: u32, sample_sz: u32, iters: u32) ->
         }
     }
 
-    // bbox + blocos + labels
     let mut bmin = vec![i16::MAX; kk * DIMS];
     let mut bmax = vec![i16::MIN; kk * DIMS];
     for c in 0..kk {
@@ -345,6 +335,7 @@ fn build_ivf(vecs: &[i16], labels: &[u8], k: u32, sample_sz: u32, iters: u32) ->
             let src = vec_at(vecs, orig);
             for d in 0..DIMS {
                 let v = src[d];
+                // pair-SoA: dims stored interleaved per lane via block_pair_offset
                 let off = layout.blocks + (block * DIMS * BLOCK + block_pair_offset(d, lane)) * 2;
                 put_i16(&mut out, off, v);
                 if v < bmin[c * DIMS + d] {

@@ -1,8 +1,6 @@
-//! Normalização 14-dim do corpo JSON de /fraud-score → vetor int16.
-//! Porte BIT-A-BIT do `normalizer.hpp` do top1 (dalvorsn), que crava accuracy
-//! 6000: features computadas em f32 (via `fast_f32`), depois ×10000 em f64 +
-//! arredondamento (`quantize`). NÃO trocar f32→f64 nas features: o boundary de
-//! arredondamento é o que faz casar com o ground-truth oficial.
+//! Bit-exact port of dalvorsn's `normalizer.hpp`: features in f32, then ×10000
+//! in f64 + round. Keep f32 on features — the rounding boundary is what matches
+//! the official ground-truth.
 
 use crate::quant::quantize;
 
@@ -44,8 +42,7 @@ fn mcc_risk(mcc: &[u8]) -> f32 {
     }
 }
 
-/// Parser de float idêntico ao `fast_f32` do dalvorsn: parte inteira em u32,
-/// parte fracionária em u32/divisor, ambos castados pra f32 e somados em f32.
+/// Mirrors dalvorsn's `fast_f32`: int and frac parts summed in f32.
 #[inline]
 fn fast_f32(b: &[u8], mut p: usize) -> f32 {
     let n = b.len();
@@ -81,7 +78,7 @@ fn digit4(b: &[u8], p: usize) -> i32 {
         + (b[p + 3] - b'0') as i32
 }
 
-/// Sakamoto (segunda=0).
+/// Sakamoto (Monday=0).
 #[inline]
 fn fast_weekday(y: i32, m: i32, d: i32) -> i32 {
     const T: [i32; 12] = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
@@ -93,7 +90,7 @@ fn fast_weekday(y: i32, m: i32, d: i32) -> i32 {
     (dow + 6) % 7
 }
 
-/// Howard Hinnant civil→epoch (segundos).
+/// Howard Hinnant civil→epoch seconds.
 #[inline]
 fn fast_epoch(y: i32, m: i32, d: i32, hh: i32, mm: i32, ss: i32) -> i64 {
     let (mut y, mut m) = (y, m);
@@ -122,7 +119,6 @@ enum Sec {
     Last,
 }
 
-/// Normaliza o corpo JSON cru em um vetor int16[14]. `None` se malformado.
 pub fn normalize(js: &[u8]) -> Option<[i16; 14]> {
     let end = js.len();
     let mut sec = Sec::Root;
@@ -161,7 +157,7 @@ pub fn normalize(js: &[u8]) -> Option<[i16; 14]> {
         }
         let key = &js[key_start..p];
         if p < end {
-            p += 1; // aspas de fechamento
+            p += 1;
         }
         while p < end && (js[p] == b' ' || js[p] == b'\t') {
             p += 1;
@@ -332,10 +328,8 @@ pub fn normalize(js: &[u8]) -> Option<[i16; 14]> {
 mod tests {
     use super::*;
 
-    // test-data.json entry 0 (expected_fraud_score = 0)
     const ENTRY0: &[u8] = br#"{"id":"tx-1641912674","transaction":{"amount":441.59,"installments":1,"requested_at":"2027-07-09T16:31:06Z"},"customer":{"avg_amount":883.18,"tx_count_24h":1,"known_merchants":["MERC-004","MERC-017"]},"merchant":{"id":"MERC-004","mcc":"5411","avg_amount":302.78},"terminal":{"is_online":false,"card_present":true,"km_from_home":33.8814492067},"last_transaction":{"timestamp":"2027-06-04T14:14:22Z","km_from_current":18.4353521556}}"#;
 
-    // last_transaction null → sentinela nas dims 5,6
     const ENTRY_NULL_LAST: &[u8] = br#"{"id":"tx-1","transaction":{"amount":41.12,"installments":2,"requested_at":"2026-03-11T18:45:53Z"},"customer":{"avg_amount":82.24,"tx_count_24h":3,"known_merchants":["MERC-003","MERC-016"]},"merchant":{"id":"MERC-099","mcc":"7995","avg_amount":60.25},"terminal":{"is_online":true,"card_present":false,"km_from_home":29.2331036248},"last_transaction":null}"#;
 
     #[test]
@@ -348,7 +342,6 @@ mod tests {
         assert_eq!(v[10], 10000, "card_present true");
         assert_eq!(v[11], 0, "MERC-004 in known_merchants");
         assert_eq!(v[12], 1500, "mcc 5411 = 0.15");
-        // dims 5,6 computadas (tem last_transaction)
         assert!(v[5] >= 0, "minutes since last computed");
     }
 

@@ -1,10 +1,3 @@
-//! Busca IVF + repair pass.
-//! - scalar: correto e arch-independente (fallback p/ arm64, testes, gate local).
-//! - AVX2 (x86_64): port fiel do kernel pair-SoA do top1 (ivf.hpp), com prune
-//!   6/14·10/14 e bbox_lower_bound_8 no repair. É o caminho de produção (rig amd64)
-//!   e colapsa o tail do repair de ms→µs. A aritmética é inteira → resultado
-//!   idêntico ao scalar (revalidado no gate amd64).
-
 use crate::format::{block_pair_offset, layout_for, IndexLayout, BLOCK, DIMS, MAGIC, PAIRS, VERSION};
 
 #[cfg(target_arch = "x86_64")]
@@ -60,8 +53,8 @@ pub struct Index<'a> {
     pub n: u32,
     pub total_blocks: usize,
     l: IndexLayout,
-    // tabelas pair-SoA (owned) para o caminho AVX2; pequenas (~350KB p/ k=4096).
     n_groups: usize,
+    // pair-SoA tables for the AVX2 path
     cpsoa: Vec<i16>,
     bpsoa_min: Vec<i16>,
     bpsoa_max: Vec<i16>,
@@ -89,7 +82,6 @@ impl<'a> Index<'a> {
         let k = k as usize;
         let n_groups = (k + 7) / 8;
 
-        // monta cpsoa / bpsoa (pair-SoA) a partir do layout row-major do arquivo.
         let mut idx = Index {
             raw,
             k,
@@ -124,7 +116,6 @@ impl<'a> Index<'a> {
         }
     }
 
-    // ---- acessores scalar (row-major no arquivo) ----
     #[inline]
     fn centroid(&self, c: usize, d: usize) -> i16 {
         rd_i16(self.raw, self.l.centroids + (c * DIMS + d) * 2)
@@ -154,7 +145,6 @@ impl<'a> Index<'a> {
         self.raw[self.l.labels + block_id * BLOCK + lane]
     }
 
-    /// Dispatch: AVX2 no x86_64 (se disponível), senão scalar.
     #[inline]
     pub fn search(&self, q: &[i16; DIMS], nprobe: usize, repair_min: u8, repair_max: u8) -> u8 {
         #[cfg(target_arch = "x86_64")]
@@ -166,9 +156,6 @@ impl<'a> Index<'a> {
         self.search_scalar(q, nprobe, repair_min, repair_max)
     }
 
-    // =====================================================================
-    // Caminho scalar (referência / fallback)
-    // =====================================================================
     #[inline]
     fn dist_centroid(&self, q: &[i16; DIMS], c: usize) -> u64 {
         let mut s: i64 = 0;
@@ -298,9 +285,6 @@ impl<'a> Index<'a> {
     }
 }
 
-// =========================================================================
-// Caminho AVX2 (x86_64) — port do ivf.hpp do top1
-// =========================================================================
 #[cfg(target_arch = "x86_64")]
 impl<'a> Index<'a> {
     #[inline]
@@ -407,6 +391,7 @@ impl<'a> Index<'a> {
             let mut acc0 = Self::spair(blk, 0, vq);
             let mut acc1 = Self::spair(blk, 1, vq);
             acc0 = _mm256_add_epi32(acc0, Self::spair(blk, 2, vq));
+            // pruning checkpoint: bail once partial sum already exceeds the top-5 worst
             if _mm256_movemask_epi8(_mm256_cmpgt_epi32(vmax, _mm256_add_epi32(acc0, acc1))) == 0 {
                 continue;
             }

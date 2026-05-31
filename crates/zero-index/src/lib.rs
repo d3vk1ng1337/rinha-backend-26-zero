@@ -1,6 +1,4 @@
-//! Núcleo do índice IVF: formato pair-SoA, quantização int16, normalização
-//! 14-dim e busca. Portado fielmente do pipeline f32 que crava accuracy 6000
-//! (ver docs/specs). Sem dependências — usado pelo servidor no hot path.
+//! IVF index core. Faithful port of the f32 reference pipeline (accuracy 6000).
 
 pub mod format;
 pub mod normalize;

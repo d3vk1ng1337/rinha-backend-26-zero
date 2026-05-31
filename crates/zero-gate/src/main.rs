@@ -1,8 +1,3 @@
-//! Gate de accuracy local: roda o test-data.json oficial contra o índice e
-//! reporta FP/FN/weighted_E vs `expected_approved`/`expected_fraud_score`.
-//! No Mac (arm64) é DIRECIONAL — o árbitro bit-exato é o gate amd64. Mas como
-//! a busca é inteira e a normalização é f32 IEEE, deve casar.
-
 use std::env;
 use std::fs;
 use std::time::Instant;
@@ -69,10 +64,10 @@ fn main() {
             approve_match += 1;
         }
         if !pred_approved && exp_approved {
-            fp += 1; // previu fraude, era legítimo
+            fp += 1;
         }
         if pred_approved && !exp_approved {
-            fn_ += 1; // previu legítimo, era fraude
+            fn_ += 1;
         }
     }
     let weighted_e = fp * 1 + fn_ * 3;

@@ -1,6 +1,5 @@
-//! Load balancer: accept TCP :9999 → round-robin → entrega o fd cru ao worker
-//! via SCM_RIGHTS. Fora do caminho de request (regra: só distribui). Porte do
-//! lb.cpp do top1, em Rust.
+//! Load balancer: accept on :9999, round-robin, hand the raw fd to a worker via
+//! SCM_RIGHTS. Off the request path. Port of the top1 lb.cpp.
 
 use std::os::raw::c_void;
 use std::time::Duration;
@@ -130,7 +129,7 @@ pub fn run() {
                 ok = true;
                 break;
             }
-            // ctrl quebrou: reconecta e tenta de novo nesse mesmo
+            // ctrl died: reconnect and retry once on the same backend
             unsafe { libc::close(ups[idx]) };
             ups[idx] = connect_ctrl(&paths[idx]);
             if ups[idx] >= 0 && send_fd(ups[idx], cfd) >= 0 {
@@ -139,6 +138,6 @@ pub fn run() {
             }
         }
         let _ = ok;
-        unsafe { libc::close(cfd) }; // worker já é dono do fd
+        unsafe { libc::close(cfd) }; // worker now owns the fd
     }
 }

@@ -1,8 +1,6 @@
-//! Formato em disco do índice IVF (pair-SoA), idêntico ao layout C++ provado.
-
 pub const DIMS: usize = 14;
 pub const BLOCK: usize = 8;
-pub const PAIRS: usize = DIMS / 2; // 7
+pub const PAIRS: usize = DIMS / 2;
 pub const MAGIC: u64 = u64::from_le_bytes(*b"RH26ZERO");
 pub const VERSION: u32 = 1;
 
@@ -38,7 +36,6 @@ fn align_up(v: usize, a: usize) -> usize {
     (v + a - 1) & !(a - 1)
 }
 
-/// Offsets (em bytes) de cada seção, dado k clusters e total_blocks blocos.
 pub fn layout_for(k: u32, total_blocks: u32) -> IndexLayout {
     let k = k as usize;
     let tb = total_blocks as usize;
@@ -64,8 +61,7 @@ pub fn layout_for(k: u32, total_blocks: u32) -> IndexLayout {
     l
 }
 
-/// Offset (em unidades de i16) dentro do array [i16; DIMS*BLOCK] de um bloco,
-/// para (dimensão d, lane). Layout pair-SoA: (d/2)*BLOCK*2 + lane*2 + (d&1).
+/// pair-SoA layout within [i16; DIMS*BLOCK]: (d/2)*BLOCK*2 + lane*2 + (d&1).
 #[inline]
 pub fn block_pair_offset(d: usize, lane: usize) -> usize {
     (d / 2) * BLOCK * 2 + lane * 2 + (d & 1)
@@ -86,7 +82,6 @@ mod tests {
         assert_eq!(l.centroids, 64);
         assert_eq!(l.bbox_min, 64 + 8 * DIMS * 2);
         assert_eq!(l.bbox_max, 64 + 2 * 8 * DIMS * 2);
-        // offsets aligned to 4 after 3 i16 sections (each 8*14*2 = 224, total 672, +64 = 736, /4 ok)
         assert_eq!(l.offsets % 4, 0);
         assert!(l.total > l.blocks);
     }
