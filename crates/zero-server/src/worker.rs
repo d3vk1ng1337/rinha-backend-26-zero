@@ -147,23 +147,9 @@ pub fn run() {
         }
     };
 
-    let spin = std::time::Duration::from_micros(env_parse::<u64>("SPIN_US", 0));
     let mut events = vec![libc::epoll_event { events: 0, u64: 0 }; MAX_EVENTS];
     loop {
-        let mut n = unsafe { libc::epoll_wait(epfd, events.as_mut_ptr(), MAX_EVENTS as c_int, 0) };
-        if n == 0 && !spin.is_zero() {
-            let start = std::time::Instant::now();
-            while start.elapsed() < spin {
-                n = unsafe { libc::epoll_wait(epfd, events.as_mut_ptr(), MAX_EVENTS as c_int, 0) };
-                if n != 0 {
-                    break;
-                }
-                std::hint::spin_loop();
-            }
-        }
-        if n == 0 {
-            n = unsafe { libc::epoll_wait(epfd, events.as_mut_ptr(), MAX_EVENTS as c_int, -1) };
-        }
+        let n = unsafe { libc::epoll_wait(epfd, events.as_mut_ptr(), MAX_EVENTS as c_int, -1) };
         if n < 0 {
             if errno() == libc::EINTR {
                 continue;
