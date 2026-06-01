@@ -1,6 +1,15 @@
 x-worker: &worker
-  image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:26c938cfbdde800f39adfe908cc233aca9c202fb
+  image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:2b0f5e955f3b40c0e9553570c03b5965160c60ed
   command: ["worker"]
+  environment: &workerenv
+    INDEX_PATH: /index/index.bin
+    NPROBE: "12"
+    REPAIR_MIN: "1"
+    REPAIR_MAX: "4"
+    ENGINE: "uring"
+    MALLOC_ARENA_MAX: "1"
+  security_opt:
+    - seccomp:unconfined
   volumes:
     - socks:/run/sock
   ulimits:
@@ -12,13 +21,8 @@ services:
   worker0:
     <<: *worker
     environment:
+      <<: *workerenv
       CTRL: /run/sock/api0.ctrl
-      INDEX_PATH: /index/index.bin
-      NPROBE: "12"
-      REPAIR_MIN: "1"
-      REPAIR_MAX: "4"
-      BUSY_POLL_US: "50"
-      MALLOC_ARENA_MAX: "1"
     deploy:
       resources:
         limits:
@@ -28,13 +32,8 @@ services:
   worker1:
     <<: *worker
     environment:
+      <<: *workerenv
       CTRL: /run/sock/api1.ctrl
-      INDEX_PATH: /index/index.bin
-      NPROBE: "12"
-      REPAIR_MIN: "1"
-      REPAIR_MAX: "4"
-      BUSY_POLL_US: "50"
-      MALLOC_ARENA_MAX: "1"
     deploy:
       resources:
         limits:
@@ -42,11 +41,14 @@ services:
           memory: 160M
 
   lb:
-    image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:26c938cfbdde800f39adfe908cc233aca9c202fb
+    image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:2b0f5e955f3b40c0e9553570c03b5965160c60ed
     command: ["lb"]
     environment:
       PORT: "9999"
       BACKENDS: "/run/sock/api0.ctrl,/run/sock/api1.ctrl"
+      ENGINE: "uring"
+    security_opt:
+      - seccomp:unconfined
     ports:
       - "9999:9999"
     volumes:
