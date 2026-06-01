@@ -37,7 +37,7 @@ fn connect_ctrl(path: &str) -> i32 {
     }
 }
 
-fn connect_wait(path: &str) -> i32 {
+pub(crate) fn connect_wait(path: &str) -> i32 {
     loop {
         let fd = connect_ctrl(path);
         if fd >= 0 {
@@ -47,7 +47,7 @@ fn connect_wait(path: &str) -> i32 {
     }
 }
 
-fn make_listen(port: u16) -> i32 {
+pub(crate) fn make_listen(port: u16) -> i32 {
     unsafe {
         let fd = libc::socket(
             libc::AF_INET,

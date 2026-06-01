@@ -1,0 +1,79 @@
+x-worker: &worker
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+  command: ["worker"]
+  environment: &workerenv
+    INDEX_PATH: /index/index.bin
+    NPROBE: "12"
+    REPAIR_MIN: "1"
+    REPAIR_MAX: "4"
+    ENGINE: "uring"
+    MALLOC_ARENA_MAX: "1"
+  security_opt:
+    - seccomp:unconfined
+  volumes:
+    - socks:/run/sock
+  ulimits:
+    nofile:
+      soft: 65535
+      hard: 65535
+
+services:
+  worker0:
+    <<: *worker
+    environment:
+      <<: *workerenv
+      CTRL: /run/sock/api0.ctrl
+    deploy:
+      resources:
+        limits:
+          cpus: "0.45"
+          memory: 160M
+
+  worker1:
+    <<: *worker
+    environment:
+      <<: *workerenv
+      CTRL: /run/sock/api1.ctrl
+    deploy:
+      resources:
+        limits:
+          cpus: "0.45"
+          memory: 160M
+
+  lb:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    command: ["lb"]
+    environment:
+      PORT: "9999"
+      BACKENDS: "/run/sock/api0.ctrl,/run/sock/api1.ctrl"
+      ENGINE: "uring"
+    security_opt:
+      - seccomp:unconfined
+    ports:
+      - "${HOST_PORT:-9999}:9999"
+    volumes:
+      - socks:/run/sock
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    depends_on:
+      - worker0
+      - worker1
+    deploy:
+      resources:
+        limits:
+          cpus: "0.10"
+          memory: 30M
+
+volumes:
+  socks:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "size=10m"

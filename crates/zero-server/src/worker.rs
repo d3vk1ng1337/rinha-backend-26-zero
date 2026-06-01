@@ -50,7 +50,7 @@ fn epoll_del(epfd: i32, fd: i32) {
     }
 }
 
-fn create_ctrl_socket(path: &str) -> i32 {
+pub(crate) fn create_ctrl_socket(path: &str) -> i32 {
     unsafe {
         if let Some(slash) = path.rfind('/') {
             let dir = std::ffi::CString::new(&path[..slash]).unwrap();

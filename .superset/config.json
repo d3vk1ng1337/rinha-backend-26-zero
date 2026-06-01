@@ -1,0 +1,5 @@
+{
+  "setup": ["cargo fetch"],
+  "run": ["docker compose -f deploy/docker-compose.yml up --build"],
+  "teardown": ["docker compose -f deploy/docker-compose.yml down -v"]
+}
