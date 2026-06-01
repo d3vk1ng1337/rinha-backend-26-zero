@@ -11,40 +11,37 @@ x-worker: &worker
 services:
   worker0:
     <<: *worker
-    cpuset: "0"
     environment:
       CTRL: /run/sock/api0.ctrl
       INDEX_PATH: /index/index.bin
       NPROBE: "12"
       REPAIR_MIN: "1"
       REPAIR_MAX: "4"
-      BUSY_POLL_US: "100"
+      BUSY_POLL_US: "50"
     deploy:
       resources:
         limits:
-          cpus: "0.40"
-          memory: 165M
+          cpus: "0.45"
+          memory: 150M
 
   worker1:
     <<: *worker
-    cpuset: "1"
     environment:
       CTRL: /run/sock/api1.ctrl
       INDEX_PATH: /index/index.bin
       NPROBE: "12"
       REPAIR_MIN: "1"
       REPAIR_MAX: "4"
-      BUSY_POLL_US: "100"
+      BUSY_POLL_US: "50"
     deploy:
       resources:
         limits:
-          cpus: "0.40"
-          memory: 165M
+          cpus: "0.45"
+          memory: 150M
 
   lb:
     image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:latest
     command: ["lb"]
-    cpuset: "2,3"
     environment:
       PORT: "9999"
       BACKENDS: "/run/sock/api0.ctrl,/run/sock/api1.ctrl"
@@ -62,8 +59,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.20"
-          memory: 20M
+          cpus: "0.10"
+          memory: 32M
 
 volumes:
   socks:
