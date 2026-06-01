@@ -13,42 +13,41 @@ x-worker: &worker
 services:
   worker0:
     <<: *worker
-    cpuset: "0"
     environment:
       CTRL: /run/sock/api0.ctrl
       INDEX_PATH: /index/index.bin
       NPROBE: "12"
       REPAIR_MIN: "1"
       REPAIR_MAX: "4"
-      BUSY_POLL_US: "${BUSY_POLL_US:-100}"
+      BUSY_POLL_US: "50"
+      MALLOC_ARENA_MAX: "1"
     deploy:
       resources:
         limits:
-          cpus: "0.40"
-          memory: 165M
+          cpus: "0.42"
+          memory: 160M
 
   worker1:
     <<: *worker
-    cpuset: "1"
     environment:
       CTRL: /run/sock/api1.ctrl
       INDEX_PATH: /index/index.bin
       NPROBE: "12"
       REPAIR_MIN: "1"
       REPAIR_MAX: "4"
-      BUSY_POLL_US: "${BUSY_POLL_US:-100}"
+      BUSY_POLL_US: "50"
+      MALLOC_ARENA_MAX: "1"
     deploy:
       resources:
         limits:
-          cpus: "0.40"
-          memory: 165M
+          cpus: "0.42"
+          memory: 160M
 
   lb:
     build:
       context: ..
       dockerfile: deploy/Dockerfile
     command: ["lb"]
-    cpuset: "2,3"
     environment:
       PORT: "9999"
       BACKENDS: "/run/sock/api0.ctrl,/run/sock/api1.ctrl"
@@ -66,8 +65,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.20"
-          memory: 20M
+          cpus: "0.16"
+          memory: 30M
 
 volumes:
   socks:

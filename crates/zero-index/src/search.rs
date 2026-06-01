@@ -145,6 +145,17 @@ impl<'a> Index<'a> {
         self.raw[self.l.labels + block_id * BLOCK + lane]
     }
 
+    pub fn warmup(&self, iters: usize, nprobe: usize, repair_min: u8, repair_max: u8) {
+        let mut q = [0i16; DIMS];
+        for it in 0..iters {
+            let c = it % self.k.max(1);
+            for d in 0..DIMS {
+                q[d] = self.centroid(c, d);
+            }
+            std::hint::black_box(self.search(&q, nprobe, repair_min, repair_max));
+        }
+    }
+
     #[inline]
     pub fn search(&self, q: &[i16; DIMS], nprobe: usize, repair_min: u8, repair_max: u8) -> u8 {
         #[cfg(target_arch = "x86_64")]
@@ -386,6 +397,9 @@ impl<'a> Index<'a> {
         let blocks_base = self.raw.as_ptr().add(self.l.blocks) as *const i16;
         for bi_off in 0..nblocks {
             let bi = blk_start + bi_off;
+            if bi_off + 2 < nblocks {
+                _mm_prefetch(blocks_base.add((bi + 2) * DIMS * BLOCK) as *const i8, _MM_HINT_T0);
+            }
             let blk = blocks_base.add(bi * DIMS * BLOCK);
             let vmax = _mm256_set1_epi32(core::cmp::min(*max_top, i32::MAX as u32) as i32);
             let mut acc0 = Self::spair(blk, 0, vq);

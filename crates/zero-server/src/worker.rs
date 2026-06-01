@@ -124,6 +124,12 @@ pub fn run() {
         index.k, index.n, nprobe, repair_min, repair_max
     );
 
+    let warmup: usize = env_parse("WARMUP_ITERS", 4000);
+    if warmup > 0 {
+        index.warmup(warmup, nprobe, repair_min, repair_max);
+        eprintln!("[worker] warmup {warmup} iters ok");
+    }
+
     let ctrl_listen = create_ctrl_socket(&ctrl_path);
     let epfd = unsafe { libc::epoll_create1(0) };
     if busy_poll > 0 {
@@ -141,9 +147,23 @@ pub fn run() {
         }
     };
 
+    let spin = std::time::Duration::from_micros(env_parse::<u64>("SPIN_US", 0));
     let mut events = vec![libc::epoll_event { events: 0, u64: 0 }; MAX_EVENTS];
     loop {
-        let n = unsafe { libc::epoll_wait(epfd, events.as_mut_ptr(), MAX_EVENTS as c_int, -1) };
+        let mut n = unsafe { libc::epoll_wait(epfd, events.as_mut_ptr(), MAX_EVENTS as c_int, 0) };
+        if n == 0 && !spin.is_zero() {
+            let start = std::time::Instant::now();
+            while start.elapsed() < spin {
+                n = unsafe { libc::epoll_wait(epfd, events.as_mut_ptr(), MAX_EVENTS as c_int, 0) };
+                if n != 0 {
+                    break;
+                }
+                std::hint::spin_loop();
+            }
+        }
+        if n == 0 {
+            n = unsafe { libc::epoll_wait(epfd, events.as_mut_ptr(), MAX_EVENTS as c_int, -1) };
+        }
         if n < 0 {
             if errno() == libc::EINTR {
                 continue;
