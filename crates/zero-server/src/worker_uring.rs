@@ -175,6 +175,13 @@ unsafe fn send_resp(ring: &mut IoUring, fd: i32, resp: &'static [u8]) {
     push(ring, &e);
 }
 
+/// Probe whether io_uring is usable (kernel + seccomp allow io_uring_setup).
+/// Default docker seccomp returns EPERM (not KILL) for blocked syscalls, so this
+/// is safe — it returns false instead of crashing.
+pub fn uring_available() -> bool {
+    IoUring::builder().build(8).is_ok()
+}
+
 fn build_ring() -> IoUring {
     if let Ok(r) = IoUring::builder()
         .setup_single_issuer()

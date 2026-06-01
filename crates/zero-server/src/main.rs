@@ -15,7 +15,11 @@ mod worker_uring;
 
 #[cfg(target_os = "linux")]
 fn main() {
-    let uring = std::env::var("ENGINE").as_deref() == Ok("uring");
+    let want_uring = std::env::var("ENGINE").as_deref() == Ok("uring");
+    let uring = want_uring && worker_uring::uring_available();
+    if want_uring && !uring {
+        eprintln!("[main] io_uring unavailable (seccomp/kernel) -> epoll fallback");
+    }
     match std::env::args().nth(1).as_deref() {
         Some("lb") if uring => lb_uring::run(),
         Some("lb") => lb::run(),

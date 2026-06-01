@@ -10,8 +10,6 @@ x-worker: &worker
     REPAIR_MAX: "4"
     ENGINE: "uring"
     MALLOC_ARENA_MAX: "1"
-  security_opt:
-    - seccomp:unconfined
   volumes:
     - socks:/run/sock
   ulimits:
@@ -51,8 +49,6 @@ services:
       PORT: "9999"
       BACKENDS: "/run/sock/api0.ctrl,/run/sock/api1.ctrl"
       ENGINE: "uring"
-    security_opt:
-      - seccomp:unconfined
     ports:
       - "${HOST_PORT:-9999}:9999"
     volumes:
