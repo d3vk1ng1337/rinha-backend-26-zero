@@ -1,7 +1,18 @@
 {
-  "participants": ["dev king"],
-  "social": ["https://github.com/d3vk1ng1337"],
+  "participants": [
+    "dev king"
+  ],
+  "social": [
+    "https://github.com/d3vk1ng1337"
+  ],
   "source-code-repo": "https://github.com/d3vk1ng1337/rinha-backend-26-zero",
-  "stack": ["rust", "epoll", "scm_rights", "avx2", "ivf"],
+  "stack": [
+    "rust",
+    "io_uring",
+    "epoll",
+    "scm_rights",
+    "avx2",
+    "ivf"
+  ],
   "open_to_work": false
 }
