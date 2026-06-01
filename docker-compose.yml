@@ -1,5 +1,5 @@
 x-worker: &worker
-  image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:07dd6f3f17b0db25a8ebd76473df299a5a16bc66
+  image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:26c938cfbdde800f39adfe908cc233aca9c202fb
   command: ["worker"]
   volumes:
     - socks:/run/sock
@@ -42,7 +42,7 @@ services:
           memory: 160M
 
   lb:
-    image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:07dd6f3f17b0db25a8ebd76473df299a5a16bc66
+    image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:26c938cfbdde800f39adfe908cc233aca9c202fb
     command: ["lb"]
     environment:
       PORT: "9999"
