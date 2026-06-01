@@ -11,7 +11,6 @@ x-worker: &worker
 services:
   worker0:
     <<: *worker
-    cpuset: "0"
     environment:
       CTRL: /run/sock/api0.ctrl
       INDEX_PATH: /index/index.bin
@@ -28,7 +27,6 @@ services:
 
   worker1:
     <<: *worker
-    cpuset: "1"
     environment:
       CTRL: /run/sock/api1.ctrl
       INDEX_PATH: /index/index.bin
@@ -46,7 +44,6 @@ services:
   lb:
     image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:07dd6f3f17b0db25a8ebd76473df299a5a16bc66
     command: ["lb"]
-    cpuset: "2,3"
     environment:
       PORT: "9999"
       BACKENDS: "/run/sock/api0.ctrl,/run/sock/api1.ctrl"
