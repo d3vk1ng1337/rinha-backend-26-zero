@@ -1,5 +1,5 @@
 x-worker: &worker
-  image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:latest
+  image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:07dd6f3f17b0db25a8ebd76473df299a5a16bc66
   command: ["worker"]
   volumes:
     - socks:/run/sock
@@ -18,11 +18,12 @@ services:
       REPAIR_MIN: "1"
       REPAIR_MAX: "4"
       BUSY_POLL_US: "50"
+      MALLOC_ARENA_MAX: "1"
     deploy:
       resources:
         limits:
-          cpus: "0.45"
-          memory: 150M
+          cpus: "0.42"
+          memory: 160M
 
   worker1:
     <<: *worker
@@ -33,14 +34,15 @@ services:
       REPAIR_MIN: "1"
       REPAIR_MAX: "4"
       BUSY_POLL_US: "50"
+      MALLOC_ARENA_MAX: "1"
     deploy:
       resources:
         limits:
-          cpus: "0.45"
-          memory: 150M
+          cpus: "0.42"
+          memory: 160M
 
   lb:
-    image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:latest
+    image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:07dd6f3f17b0db25a8ebd76473df299a5a16bc66
     command: ["lb"]
     environment:
       PORT: "9999"
@@ -59,8 +61,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.10"
-          memory: 32M
+          cpus: "0.16"
+          memory: 30M
 
 volumes:
   socks:
