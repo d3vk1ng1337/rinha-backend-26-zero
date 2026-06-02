@@ -67,6 +67,9 @@ pub struct Index<'a> {
     cpsoa: Vec<i16>,
     bpsoa_min: Vec<i16>,
     bpsoa_max: Vec<i16>,
+    // adaptive: per-fraud-count worst-distance threshold; if the fast pass's 5th-nearest
+    // distance reaches it, verify via repair even when the count looks settled. MAX = off.
+    worst_thr: [u32; 6],
 }
 
 impl<'a> Index<'a> {
@@ -101,9 +104,15 @@ impl<'a> Index<'a> {
             cpsoa: vec![0; n_groups * PAIRS * 16],
             bpsoa_min: vec![0; n_groups * PAIRS * 16],
             bpsoa_max: vec![0; n_groups * PAIRS * 16],
+            worst_thr: [u32::MAX; 6],
         };
         idx.build_soa();
         Some(idx)
+    }
+
+    /// Enable adaptive nprobe: per-count worst-distance thresholds (MAX = disabled).
+    pub fn set_worst_thr(&mut self, thr: [u32; 6]) {
+        self.worst_thr = thr;
     }
 
     fn build_soa(&mut self) {
@@ -174,6 +183,61 @@ impl<'a> Index<'a> {
             }
         }
         self.search_scalar(q, nprobe, repair_min, repair_max)
+    }
+
+    /// Fast pass only (scalar, no repair): returns (fraud_count, 5th-nearest distance).
+    /// Used offline to tune the adaptive worst-distance thresholds.
+    pub fn search_fast(&self, q: &[i16; DIMS], nprobe: usize) -> (u8, u64) {
+        let kk = self.k;
+        let np = nprobe.clamp(1, 64).min(kk);
+        let mut best_c = [0usize; 64];
+        let mut best_d = [u64::MAX; 64];
+        let mut used = 0usize;
+        let mut worst = 0u64;
+        let mut worst_i = 0usize;
+        for c in 0..kk {
+            let d = self.dist_centroid(q, c);
+            if used < np {
+                best_c[used] = c;
+                best_d[used] = d;
+                if used == 0 || d > worst {
+                    worst = d;
+                    worst_i = used;
+                }
+                used += 1;
+            } else if d < worst {
+                best_c[worst_i] = c;
+                best_d[worst_i] = d;
+                worst = best_d[0];
+                worst_i = 0;
+                for i in 1..used {
+                    if best_d[i] > worst {
+                        worst = best_d[i];
+                        worst_i = i;
+                    }
+                }
+            }
+        }
+        for i in 1..used {
+            let (c, d) = (best_c[i], best_d[i]);
+            let mut j = i;
+            while j > 0 && best_d[j - 1] > d {
+                best_d[j] = best_d[j - 1];
+                best_c[j] = best_c[j - 1];
+                j -= 1;
+            }
+            best_d[j] = d;
+            best_c[j] = c;
+        }
+        let mut top = Top5::new();
+        for i in 0..used {
+            let c = best_c[i];
+            if i > 0 && self.bbox_lb(q, c) >= top.worst_dist() {
+                continue;
+            }
+            self.scan_cluster(c, q, &mut top);
+        }
+        (top.fraud(), top.worst_dist())
     }
 
     #[inline]
@@ -277,7 +341,9 @@ impl<'a> Index<'a> {
             scanned[c >> 6] |= 1u64 << (c & 63);
         }
         let mut fraud = top.fraud();
-        if fraud >= repair_min && fraud <= repair_max {
+        if (fraud >= repair_min && fraud <= repair_max)
+            || top.worst_dist() >= self.worst_thr[fraud as usize] as u64
+        {
             let mut cands: Vec<(u64, usize)> = Vec::new();
             for c in 0..kk {
                 if scanned[c >> 6] & (1u64 << (c & 63)) != 0 || self.count(c) == 0 {
@@ -294,10 +360,6 @@ impl<'a> Index<'a> {
                     break;
                 }
                 self.scan_cluster(c, q, &mut top);
-                let now = top.fraud();
-                if now < repair_min || now > repair_max {
-                    break;
-                }
             }
             fraud = top.fraud();
         }
@@ -454,7 +516,7 @@ impl<'a> Index<'a> {
     }
 
     #[target_feature(enable = "avx2")]
-    unsafe fn repair(&self, vq: &[__m256i; PAIRS], skip: &[u32], nskip: usize, td: &mut [u32; 5], tl: &mut [u8; 5], max_top: &mut u32, repair_min: u8, repair_max: u8) {
+    unsafe fn repair(&self, vq: &[__m256i; PAIRS], skip: &[u32], nskip: usize, td: &mut [u32; 5], tl: &mut [u8; 5], max_top: &mut u32, _repair_min: u8, _repair_max: u8) {
         let words = (self.k + 63) / 64;
         REPAIR_SKIP.with(|skip_cell| {
             REPAIR_CANDS.with(|cands_cell| {
@@ -492,11 +554,9 @@ impl<'a> Index<'a> {
                     if lb >= *max_top {
                         break;
                     }
+                    // exact: scan every bbox-viable candidate (no count-based early stop,
+                    // which would be path-dependent on the fast pass and wrong at low nprobe).
                     self.scan_cluster_avx2(vq, c as usize, td, tl, max_top);
-                    let now = tl[0] + tl[1] + tl[2] + tl[3] + tl[4];
-                    if now < repair_min || now > repair_max {
-                        break;
-                    }
                 }
             });
         });
@@ -519,7 +579,7 @@ impl<'a> Index<'a> {
             self.scan_cluster_avx2(&vq, probes[i] as usize, &mut td, &mut tl, &mut max_top);
         }
         let mut cnt = tl[0] + tl[1] + tl[2] + tl[3] + tl[4];
-        if cnt >= repair_min && cnt <= repair_max {
+        if (cnt >= repair_min && cnt <= repair_max) || max_top >= self.worst_thr[cnt as usize] {
             self.repair(&vq, &probes, np, &mut td, &mut tl, &mut max_top, repair_min, repair_max);
             cnt = tl[0] + tl[1] + tl[2] + tl[3] + tl[4];
         }

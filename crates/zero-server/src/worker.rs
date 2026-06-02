@@ -144,7 +144,21 @@ pub fn run() {
 
     let index_bytes = hardening::read_index_to_ram(&index_path).expect("read index");
     hardening::mlock_all();
-    let index = Index::from_bytes(&index_bytes).expect("parse index");
+    let mut index = Index::from_bytes(&index_bytes).expect("parse index");
+    // adaptive nprobe: NPROBE is the fast pass; WORST_THRESHOLD (6 csv) verifies obvious counts.
+    let worst_thr_env = env_str("WORST_THRESHOLD", "");
+    if !worst_thr_env.is_empty() {
+        let parts: Vec<u32> = worst_thr_env
+            .split(',')
+            .map(|x| x.trim().parse().unwrap_or(u32::MAX))
+            .collect();
+        if parts.len() == 6 {
+            let mut t = [u32::MAX; 6];
+            t.copy_from_slice(&parts);
+            index.set_worst_thr(t);
+            eprintln!("[worker] adaptive worst_thr={t:?}");
+        }
+    }
     eprintln!(
         "[worker] index k={} n={} nprobe={} repair=[{},{}]",
         index.k, index.n, nprobe, repair_min, repair_max
