@@ -8,7 +8,7 @@ x-worker: &worker
     REPAIR_MAX: "4"
     BUSY_POLL_US: "0"
     EPOLL_SPIN_US: "0"
-    EPOLL_IDLE_US: "1000"
+    EPOLL_IDLE_US: "40"
     MALLOC_ARENA_MAX: "1"
   volumes:
     - socks:/run/sock
