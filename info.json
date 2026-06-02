@@ -8,7 +8,6 @@
   "source-code-repo": "https://github.com/d3vk1ng1337/rinha-backend-26-zero",
   "stack": [
     "rust",
-    "io_uring",
     "epoll",
     "scm_rights",
     "avx2",

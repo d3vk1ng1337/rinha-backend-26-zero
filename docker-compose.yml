@@ -1,13 +1,14 @@
 x-worker: &worker
-  image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:dcb41620072ba82c5e85078f29bdfc5a14f4622e
+  image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:91df46dfffeb4d587a413bee0d8ba670f9cf5803
   command: ["worker"]
   environment: &workerenv
     INDEX_PATH: /index/index.bin
     NPROBE: "12"
     REPAIR_MIN: "1"
     REPAIR_MAX: "4"
-    ENGINE: "uring"
-    BUSY_POLL_US: "50"
+    BUSY_POLL_US: "0"
+    EPOLL_SPIN_US: "15"
+    EPOLL_IDLE_US: "80"
     MALLOC_ARENA_MAX: "1"
   volumes:
     - socks:/run/sock
@@ -40,12 +41,11 @@ services:
           memory: 160M
 
   lb:
-    image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:dcb41620072ba82c5e85078f29bdfc5a14f4622e
+    image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:91df46dfffeb4d587a413bee0d8ba670f9cf5803
     command: ["lb"]
     environment:
       PORT: "9999"
       BACKENDS: "/run/sock/api0.ctrl,/run/sock/api1.ctrl"
-      ENGINE: "uring"
     ports:
       - "9999:9999"
     volumes:
