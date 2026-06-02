@@ -2,6 +2,15 @@ use crate::format::{block_pair_offset, layout_for, IndexLayout, BLOCK, DIMS, MAG
 
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
+#[cfg(target_arch = "x86_64")]
+use std::cell::RefCell;
+
+// Reusable repair scratch — avoids per-borderline-request heap allocs (tail-spike source).
+#[cfg(target_arch = "x86_64")]
+thread_local! {
+    static REPAIR_SKIP: RefCell<Vec<u64>> = RefCell::new(Vec::new());
+    static REPAIR_CANDS: RefCell<Vec<(u32, u32)>> = RefCell::new(Vec::new());
+}
 
 #[inline]
 fn rd_i16(raw: &[u8], off: usize) -> i16 {
@@ -447,43 +456,50 @@ impl<'a> Index<'a> {
     #[target_feature(enable = "avx2")]
     unsafe fn repair(&self, vq: &[__m256i; PAIRS], skip: &[u32], nskip: usize, td: &mut [u32; 5], tl: &mut [u8; 5], max_top: &mut u32, repair_min: u8, repair_max: u8) {
         let words = (self.k + 63) / 64;
-        let mut skip_set = vec![0u64; words];
-        for &s in &skip[..nskip] {
-            skip_set[(s >> 6) as usize] |= 1u64 << (s & 63);
-        }
-        let mut cands: Vec<(u32, u32)> = Vec::with_capacity(256);
-        let mut lbs = [0u32; 8];
-        for g in 0..self.n_groups {
-            self.bbox_lb8(g, vq, &mut lbs);
-            let base = (g * 8) as u32;
-            for i in 0..8 {
-                let c = base + i as u32;
-                if (c as usize) >= self.k {
-                    continue;
+        REPAIR_SKIP.with(|skip_cell| {
+            REPAIR_CANDS.with(|cands_cell| {
+                let skip_set = &mut *skip_cell.borrow_mut();
+                let cands = &mut *cands_cell.borrow_mut();
+                skip_set.clear();
+                skip_set.resize(words, 0);
+                for &s in &skip[..nskip] {
+                    skip_set[(s >> 6) as usize] |= 1u64 << (s & 63);
                 }
-                if lbs[i] >= *max_top {
-                    continue;
+                cands.clear();
+                let mut lbs = [0u32; 8];
+                for g in 0..self.n_groups {
+                    self.bbox_lb8(g, vq, &mut lbs);
+                    let base = (g * 8) as u32;
+                    for i in 0..8 {
+                        let c = base + i as u32;
+                        if (c as usize) >= self.k {
+                            continue;
+                        }
+                        if lbs[i] >= *max_top {
+                            continue;
+                        }
+                        if skip_set[(c >> 6) as usize] & (1u64 << (c & 63)) != 0 {
+                            continue;
+                        }
+                        if self.count(c as usize) == 0 {
+                            continue;
+                        }
+                        cands.push((lbs[i], c));
+                    }
                 }
-                if skip_set[(c >> 6) as usize] & (1u64 << (c & 63)) != 0 {
-                    continue;
+                cands.sort_unstable_by_key(|&(lb, _)| lb);
+                for &(lb, c) in cands.iter() {
+                    if lb >= *max_top {
+                        break;
+                    }
+                    self.scan_cluster_avx2(vq, c as usize, td, tl, max_top);
+                    let now = tl[0] + tl[1] + tl[2] + tl[3] + tl[4];
+                    if now < repair_min || now > repair_max {
+                        break;
+                    }
                 }
-                if self.count(c as usize) == 0 {
-                    continue;
-                }
-                cands.push((lbs[i], c));
-            }
-        }
-        cands.sort_unstable_by_key(|&(lb, _)| lb);
-        for (lb, c) in cands {
-            if lb >= *max_top {
-                break;
-            }
-            self.scan_cluster_avx2(vq, c as usize, td, tl, max_top);
-            let now = tl[0] + tl[1] + tl[2] + tl[3] + tl[4];
-            if now < repair_min || now > repair_max {
-                break;
-            }
-        }
+            });
+        });
     }
 
     #[target_feature(enable = "avx2")]
