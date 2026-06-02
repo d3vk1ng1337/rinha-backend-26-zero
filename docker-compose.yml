@@ -1,5 +1,5 @@
 x-worker: &worker
-  image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:d6daf7c2aa8ea4a96ce13aeb5464b7da9e494b2c
+  image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:91df46dfffeb4d587a413bee0d8ba670f9cf5803
   command: ["worker"]
   environment: &workerenv
     INDEX_PATH: /index/index.bin
@@ -43,7 +43,7 @@ services:
           memory: 160M
 
   lb:
-    image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:d6daf7c2aa8ea4a96ce13aeb5464b7da9e494b2c
+    image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:91df46dfffeb4d587a413bee0d8ba670f9cf5803
     command: ["lb"]
     cpuset: "2,3"
     environment:
