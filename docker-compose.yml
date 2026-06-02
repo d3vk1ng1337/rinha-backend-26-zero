@@ -1,5 +1,5 @@
 x-worker: &worker
-  image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:91df46dfffeb4d587a413bee0d8ba670f9cf5803
+  image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:d6daf7c2aa8ea4a96ce13aeb5464b7da9e494b2c
   command: ["worker"]
   environment: &workerenv
     INDEX_PATH: /index/index.bin
@@ -8,7 +8,7 @@ x-worker: &worker
     REPAIR_MAX: "4"
     BUSY_POLL_US: "0"
     EPOLL_SPIN_US: "0"
-    EPOLL_IDLE_US: "20"
+    EPOLL_IDLE_US: "40"
     MALLOC_ARENA_MAX: "1"
   volumes:
     - socks:/run/sock
@@ -43,7 +43,7 @@ services:
           memory: 160M
 
   lb:
-    image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:91df46dfffeb4d587a413bee0d8ba670f9cf5803
+    image: ghcr.io/d3vk1ng1337/rinha-backend-26-zero:d6daf7c2aa8ea4a96ce13aeb5464b7da9e494b2c
     command: ["lb"]
     cpuset: "2,3"
     environment:
