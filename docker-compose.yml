@@ -3,7 +3,7 @@ x-worker: &worker
   command: ["worker"]
   environment: &workerenv
     INDEX_PATH: /index/index.bin
-    NPROBE: "12"
+    NPROBE: "20"
     REPAIR_MIN: "1"
     REPAIR_MAX: "4"
     BUSY_POLL_US: "0"
