@@ -73,6 +73,14 @@ pub(crate) fn make_listen(port: u16) -> i32 {
         if libc::bind(fd, &addr as *const _ as *const libc::sockaddr, len) < 0 {
             panic!("bind :{port} -> {}", errno());
         }
+        let secs: i32 = 1;
+        libc::setsockopt(
+            fd,
+            libc::IPPROTO_TCP,
+            libc::TCP_DEFER_ACCEPT,
+            &secs as *const i32 as *const c_void,
+            std::mem::size_of::<i32>() as libc::socklen_t,
+        );
         libc::listen(fd, 65535);
         fd
     }

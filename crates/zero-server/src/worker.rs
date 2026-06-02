@@ -35,6 +35,32 @@ fn errno() -> i32 {
     unsafe { *libc::__errno_location() }
 }
 
+/// epoll_pwait2 with a microsecond idle timeout (vs epoll_wait's 1ms floor),
+/// keeping the worker warm without burning the CPU budget. ENOSYS -> ms fallback.
+fn epoll_pwait2_us(epfd: i32, events: *mut libc::epoll_event, max: c_int, idle_us: i64) -> c_int {
+    let ts = libc::timespec {
+        tv_sec: (idle_us / 1_000_000) as libc::time_t,
+        tv_nsec: ((idle_us % 1_000_000) * 1000) as libc::c_long,
+    };
+    let r = unsafe {
+        libc::syscall(
+            libc::SYS_epoll_pwait2,
+            epfd as libc::c_long,
+            events as libc::c_long,
+            max as libc::c_long,
+            &ts as *const libc::timespec as libc::c_long,
+            0 as libc::c_long, // sigmask = NULL
+            8 as libc::c_long, // sigsetsize (kernel _NSIG/8)
+        ) as c_int
+    };
+    if r < 0 && errno() == libc::ENOSYS {
+        let ms = ((idle_us + 999) / 1000).max(1) as c_int;
+        unsafe { libc::epoll_wait(epfd, events, max, ms) }
+    } else {
+        r
+    }
+}
+
 fn epoll_add(epfd: i32, fd: i32, events: u32) {
     let mut ev = libc::epoll_event {
         events,
@@ -147,9 +173,26 @@ pub fn run() {
         }
     };
 
+    // Wait strategy: short userspace spin, then epoll_pwait2 microsecond idle.
+    // Kernel busy-poll (EPIOCSPARAMS) hurts under a CPU cap, so it stays off (BUSY_POLL_US=0).
+    let spin = std::time::Duration::from_micros(env_parse::<u64>("EPOLL_SPIN_US", 15));
+    let idle_us: i64 = env_parse("EPOLL_IDLE_US", 80);
     let mut events = vec![libc::epoll_event { events: 0, u64: 0 }; MAX_EVENTS];
     loop {
-        let n = unsafe { libc::epoll_wait(epfd, events.as_mut_ptr(), MAX_EVENTS as c_int, -1) };
+        let mut n = unsafe { libc::epoll_wait(epfd, events.as_mut_ptr(), MAX_EVENTS as c_int, 0) };
+        if n == 0 && !spin.is_zero() {
+            let start = std::time::Instant::now();
+            while start.elapsed() < spin {
+                n = unsafe { libc::epoll_wait(epfd, events.as_mut_ptr(), MAX_EVENTS as c_int, 0) };
+                if n != 0 {
+                    break;
+                }
+                std::hint::spin_loop();
+            }
+        }
+        if n == 0 {
+            n = epoll_pwait2_us(epfd, events.as_mut_ptr(), MAX_EVENTS as c_int, idle_us);
+        }
         if n < 0 {
             if errno() == libc::EINTR {
                 continue;

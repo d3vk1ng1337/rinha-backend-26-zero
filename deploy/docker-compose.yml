@@ -3,6 +3,15 @@ x-worker: &worker
     context: ..
     dockerfile: deploy/Dockerfile
   command: ["worker"]
+  environment: &workerenv
+    INDEX_PATH: /index/index.bin
+    NPROBE: "12"
+    REPAIR_MIN: "1"
+    REPAIR_MAX: "4"
+    BUSY_POLL_US: "0"
+    EPOLL_SPIN_US: "15"
+    EPOLL_IDLE_US: "80"
+    MALLOC_ARENA_MAX: "1"
   volumes:
     - socks:/run/sock
   ulimits:
@@ -14,33 +23,23 @@ services:
   worker0:
     <<: *worker
     environment:
+      <<: *workerenv
       CTRL: /run/sock/api0.ctrl
-      INDEX_PATH: /index/index.bin
-      NPROBE: "12"
-      REPAIR_MIN: "1"
-      REPAIR_MAX: "4"
-      BUSY_POLL_US: "50"
-      MALLOC_ARENA_MAX: "1"
     deploy:
       resources:
         limits:
-          cpus: "0.42"
+          cpus: "0.45"
           memory: 160M
 
   worker1:
     <<: *worker
     environment:
+      <<: *workerenv
       CTRL: /run/sock/api1.ctrl
-      INDEX_PATH: /index/index.bin
-      NPROBE: "12"
-      REPAIR_MIN: "1"
-      REPAIR_MAX: "4"
-      BUSY_POLL_US: "50"
-      MALLOC_ARENA_MAX: "1"
     deploy:
       resources:
         limits:
-          cpus: "0.42"
+          cpus: "0.45"
           memory: 160M
 
   lb:
@@ -65,7 +64,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.16"
+          cpus: "0.10"
           memory: 30M
 
 volumes:
